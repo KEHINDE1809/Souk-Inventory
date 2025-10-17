@@ -1,0 +1,305 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Souk Inventory Management System</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+      html {
+        scroll-behavior: smooth;
+      }
+      .fade-in {
+        animation: fadeIn 0.5s ease-in;
+      }
+      @keyframes fadeIn {
+        from {
+          opacity: 0;
+          transform: translateY(10px);
+        }
+        to {
+          opacity: 1;
+          transform: translateY(0);
+        }
+      }
+    </style>
+  </head>
+
+  <body class="bg-gray-100 text-gray-900 transition-colors duration-300">
+    <!-- Header -->
+    <header class="bg-blue-700 text-white p-4 shadow-lg flex justify-between items-center">
+      <div>
+        <h1 class="text-2xl font-bold">Souk Inventory Management</h1>
+        <p class="text-sm opacity-90">Streamlined product & stock tracking system</p>
+      </div>
+      <button
+        id="themeToggle"
+        class="bg-blue-600 hover:bg-blue-500 px-4 py-2 rounded text-sm font-medium"
+      >
+        🌙 Dark Mode
+      </button>
+    </header>
+
+    <div class="flex">
+      <!-- Sidebar -->
+      <aside
+        class="w-64 bg-white dark:bg-gray-900 dark:text-gray-200 h-screen shadow-md p-4 transition-colors duration-300"
+      >
+        <h2 class="text-lg font-semibold mb-4">Menu</h2>
+        <nav class="space-y-2">
+          <button id="dashboardBtn" class="menu-btn">📊 Dashboard</button>
+          <button id="viewProductsBtn" class="menu-btn">🏷️ View Products</button>
+          <button id="viewOrdersBtn" class="menu-btn">📦 View Orders</button>
+          <button id="adjustStockBtn" class="menu-btn">⚙️ Adjust Stock</button>
+        </nav>
+      </aside>
+
+      <!-- Main Content -->
+      <main class="flex-1 p-8 fade-in" id="contentArea">
+        <!-- Dashboard Overview -->
+        <section id="dashboardSection">
+          <h2 class="text-xl font-semibold mb-6">Inventory Overview</h2>
+          <div class="grid grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+            <div class="stat-card">
+              <p class="text-gray-500 dark:text-gray-400">Total Products</p>
+              <p id="totalProducts" class="stat-value">0</p>
+            </div>
+            <div class="stat-card">
+              <p class="text-gray-500 dark:text-gray-400">Low Stock Items</p>
+              <p id="lowStockCount" class="stat-value text-red-600 dark:text-red-400">0</p>
+            </div>
+            <div class="stat-card">
+              <p class="text-gray-500 dark:text-gray-400">Warehouses</p>
+              <p id="totalWarehouses" class="stat-value">3</p>
+            </div>
+            <div class="stat-card">
+              <p class="text-gray-500 dark:text-gray-400">Pending Orders</p>
+              <p id="pendingOrders" class="stat-value text-yellow-600 dark:text-yellow-400">0</p>
+            </div>
+          </div>
+
+          <div class="bg-white dark:bg-gray-800 p-6 rounded-lg shadow">
+            <h3 class="text-lg font-semibold mb-4">Stock Levels Chart</h3>
+            <canvas id="stockChart" height="120"></canvas>
+          </div>
+        </section>
+
+        <!-- Products Section -->
+        <section id="productsSection" class="hidden">
+          <h2 class="text-xl font-semibold mb-4">Product Stock Levels</h2>
+          <div id="productsList" class="grid md:grid-cols-2 lg:grid-cols-3 gap-6"></div>
+        </section>
+
+        <!-- Orders Section -->
+        <section id="ordersSection" class="hidden">
+          <h2 class="text-xl font-semibold mb-4">Purchase Orders</h2>
+          <div id="ordersList" class="grid md:grid-cols-2 lg:grid-cols-3 gap-6"></div>
+        </section>
+
+        <!-- Stock Adjustment -->
+        <section id="adjustStockSection" class="hidden">
+          <h2 class="text-xl font-semibold mb-4">Adjust Product Stock</h2>
+          <form id="adjustStockForm" class="bg-white dark:bg-gray-800 p-6 rounded-lg shadow space-y-4">
+            <div>
+              <label class="block font-medium">Product ID</label>
+              <input
+                type="number"
+                id="productId"
+                class="w-full border p-2 rounded dark:bg-gray-700 dark:border-gray-600"
+                required
+              />
+            </div>
+            <div>
+              <label class="block font-medium">Quantity Change (use - for decrease)</label>
+              <input
+                type="number"
+                id="quantityChange"
+                class="w-full border p-2 rounded dark:bg-gray-700 dark:border-gray-600"
+                required
+              />
+            </div>
+            <button
+              type="submit"
+              class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded transition"
+            >
+              Update Stock
+            </button>
+          </form>
+        </section>
+      </main>
+    </div>
+
+    <!-- JS Logic -->
+    <script>
+      const API_BASE = "http://localhost:3000";
+      const themeToggle = document.getElementById("themeToggle");
+
+      // Sections
+      const dashboardSection = document.getElementById("dashboardSection");
+      const productsSection = document.getElementById("productsSection");
+      const ordersSection = document.getElementById("ordersSection");
+      const adjustStockSection = document.getElementById("adjustStockSection");
+
+      // Sidebar buttons
+      document.getElementById("dashboardBtn").addEventListener("click", () => showSection("dashboard"));
+      document.getElementById("viewProductsBtn").addEventListener("click", () => {
+        showSection("products");
+        fetchProducts();
+      });
+      document.getElementById("viewOrdersBtn").addEventListener("click", () => {
+        showSection("orders");
+        fetchOrders();
+      });
+      document.getElementById("adjustStockBtn").addEventListener("click", () => showSection("adjust"));
+
+      // Toggle between light and dark mode
+      themeToggle.addEventListener("click", () => {
+        document.body.classList.toggle("dark");
+        if (document.body.classList.contains("dark")) {
+          themeToggle.textContent = "☀️ Light Mode";
+          document.body.classList.replace("bg-gray-100", "bg-gray-900");
+        } else {
+          themeToggle.textContent = "🌙 Dark Mode";
+          document.body.classList.replace("bg-gray-900", "bg-gray-100");
+        }
+      });
+
+      // Section toggling
+      function showSection(section) {
+        [dashboardSection, productsSection, ordersSection, adjustStockSection].forEach((sec) =>
+          sec.classList.add("hidden")
+        );
+        if (section === "dashboard") dashboardSection.classList.remove("hidden");
+        if (section === "products") productsSection.classList.remove("hidden");
+        if (section === "orders") ordersSection.classList.remove("hidden");
+        if (section === "adjust") adjustStockSection.classList.remove("hidden");
+      }
+
+      // Fetch and render products
+      async function fetchProducts() {
+        const res = await fetch(`${API_BASE}/products`);
+        const products = await res.json();
+        renderProducts(products);
+        updateDashboard(products);
+      }
+
+      function renderProducts(products) {
+        const list = document.getElementById("productsList");
+        list.innerHTML = products
+          .map(
+            (p) => `
+          <div class="bg-white dark:bg-gray-800 p-4 rounded-lg shadow hover:shadow-lg transition">
+            <h3 class="font-semibold text-lg">${p.name}</h3>
+            <p class="text-sm text-gray-600 dark:text-gray-400 mb-2">${p.description}</p>
+            <p><strong>Stock:</strong> ${p.quantity_in_stock}</p>
+            <p><strong>Threshold:</strong> ${p.reorder_threshold}</p>
+            <p class="text-sm text-gray-500 mt-1">ID: ${p.product_id}</p>
+          </div>`
+          )
+          .join("");
+      }
+
+      function updateDashboard(products) {
+        const lowStock = products.filter((p) => p.quantity_in_stock < p.reorder_threshold);
+        document.getElementById("totalProducts").textContent = products.length;
+        document.getElementById("lowStockCount").textContent = lowStock.length;
+
+        const ctx = document.getElementById("stockChart").getContext("2d");
+        const labels = products.map((p) => p.name);
+        const quantities = products.map((p) => p.quantity_in_stock);
+
+        new Chart(ctx, {
+          type: "bar",
+          data: {
+            labels,
+            datasets: [
+              {
+                label: "Stock Quantity",
+                data: quantities,
+                backgroundColor: "#3b82f6",
+              },
+            ],
+          },
+          options: {
+            plugins: { legend: { display: false } },
+            scales: { y: { beginAtZero: true } },
+          },
+        });
+      }
+
+      async function fetchOrders() {
+        const res = await fetch(`${API_BASE}/orders`);
+        const orders = await res.json();
+        const pending = orders.filter((o) => !o.completed);
+        document.getElementById("pendingOrders").textContent = pending.length;
+        const list = document.getElementById("ordersList");
+        list.innerHTML = orders
+          .map(
+            (o) => `
+          <div class="bg-white dark:bg-gray-800 p-4 rounded-lg shadow">
+            <h3 class="font-semibold text-lg">Order #${o.order_id}</h3>
+            <p><strong>Product:</strong> ${o.product_id}</p>
+            <p><strong>Quantity:</strong> ${o.quantity_ordered}</p>
+            <p><strong>Supplier:</strong> ${o.supplier_id}</p>
+            <p><strong>Warehouse:</strong> ${o.warehouse_id}</p>
+            <p class="text-sm text-gray-500 mt-1">Date: ${o.order_date}</p>
+          </div>`
+          )
+          .join("");
+      }
+
+      document.getElementById("adjustStockForm").addEventListener("submit", async (e) => {
+        e.preventDefault();
+        const productId = document.getElementById("productId").value;
+        const quantityChange = parseInt(document.getElementById("quantityChange").value);
+        const res = await fetch(`${API_BASE}/products/${productId}/adjust`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ quantityChange }),
+        });
+        const data = await res.json();
+        alert(data.message || "Stock updated successfully");
+        fetchProducts();
+        showSection("dashboard");
+      });
+
+      fetchProducts();
+      fetchOrders();
+      showSection("dashboard");
+    </script>
+
+    <script>
+      // Tailwind custom classes for neatness
+      document.querySelectorAll(".menu-btn").forEach((btn) => {
+        btn.classList.add(
+          "w-full",
+          "bg-blue-100",
+          "hover:bg-blue-200",
+          "dark:bg-gray-800",
+          "dark:hover:bg-gray-700",
+          "text-blue-700",
+          "dark:text-blue-400",
+          "px-3",
+          "py-2",
+          "rounded",
+          "transition"
+        );
+      });
+      document.querySelectorAll(".stat-card").forEach((card) => {
+        card.classList.add(
+          "bg-white",
+          "dark:bg-gray-800",
+          "p-4",
+          "rounded-lg",
+          "shadow",
+          "text-center",
+          "transition"
+        );
+      });
+      document.querySelectorAll(".stat-value").forEach((val) => {
+        val.classList.add("text-2xl", "font-bold");
+      });
+    </script>
+  </body>
+</html>
