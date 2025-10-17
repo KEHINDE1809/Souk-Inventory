@@ -52,3 +52,4 @@ It provides visibility into stock levels, tracks purchase orders, and automatica
    ```bash
    git clone https://github.com/kehinde1809/souk-inventory.git
    cd souk-inventory
+Inventory management system with automatic restocking, built using Node.js, Express, and TailwindCSS.
